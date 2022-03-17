@@ -48,7 +48,8 @@ int main(int args, char** argv) {
                 std::string input = it->input_file;
                 std::string outut = it->output_file;
                 // char const *argList[it->args.size()];
-                char* argList[it->args.size() + 2];
+                char* argList[1000];
+
                 //input redirect
                 std::fstream newCin;
                 if(it->input_file != ""){
@@ -72,23 +73,53 @@ int main(int args, char** argv) {
 
                 char *newenviron[] = { NULL };
 
-                
+                // int fd1[2]; // Used to store two ends of first pipe
+                // int fd2[2]; // Used to store two ends of second pipe
+                                
+                // char fixed_str[] = "forgeeks.org";
+                // char input_str[100];
+                // pid_t p;
+                // if (pipe(fd1) == -1) {
+                //     fprintf(stderr, "Pipe Failed");
+                //     return 1;
+                // }
+                // if (pipe(fd2) == -1) {
+                //     fprintf(stderr, "Pipe Failed");
+                //     return 1;
+                // }           
 
 
                 //output redirect
-   
+                    int* fd = new int[2]; // first index is read, second is write
+                    pipe(fd);
 
                 //fork() a new proccess for each command
                 // Create a child process
                  pid_t pid = fork();
                  pid_t wpid;
-                if (pid == 0) {
+                if (pid > 0) { // if parent
+                    dup2(fd[0], STDIN_FILENO);
+                } else //if child
+                {
+                    int fd_out = dup2(fd[1], STDOUT_FILENO); 
+                    if (it->output_file != "")
+                    {
+                        freopen("outputFile.txt", "w", stdout); 
+                    }
+                    
                     execve(commandName.c_str(),argList,newenviron);
-                    exit(0);
+                    return -1;
                 }
+                
                 //wait for process to finish
                 wait(NULL);
-
+                std::string response;
+                getline(std::cin, response);
+                if (it->input_file == "" && it->output_file == ""){
+                    std::cout << response << std::endl;
+                }
+                
+                
             }
         }
              // Display a character to show the user we are in an active shell.
