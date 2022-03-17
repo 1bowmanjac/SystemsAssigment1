@@ -16,22 +16,21 @@ std::streambuf* stream_buffer_cout = std::cout.rdbuf(); //backup of cout stream 
 bool isCoutNormal = true;
 std::streambuf* stream_buffer_cin = std::cin.rdbuf(); //backup of cin stream buffer
 bool isCinNormal = true;
-char** argList;
+char* argList[1000];
 
 
 
 void stringToArgv(std::string str){
-    char* tempList[1000];
+    
     std::string word;
     int i = 1;
     std::istringstream lineStream(str);
     while (lineStream >> word)
     {
-        tempList[i] = strdup(word.c_str());
+        argList[i] = strdup(word.c_str());
         i++;
     }
     argList[i] = NULL;
-    argList = tempList;
 }
 
 int main(int args, char** argv) {
@@ -68,56 +67,43 @@ int main(int args, char** argv) {
                 std::string outut = it->output_file;
                 std::string argLine;
 
-                std::cout << it->input_file << std::endl;
                 //input redirect
                 std::fstream newCin;
-                if(it->input_file != "" && it == commands->begin()){
+                if(it->input_file != "" && it == commands->begin()){ // if you are the first line and have an input redirect
                     std::cout << "redirecting input" << std::endl;
                     newCin.open(it->input_file, std::ios::in);
                     getline(newCin,argLine);
 
                     stringToArgv(argLine);
-                    std::cout << "this runs" << std::endl;
-                    int i = 1;
-                    while(argList[i] != NULL){
-                        std::cout << argList[i] << std::endl;
-                        i++;
-                    }
+
                     newCin.close();
-                }
-                    char* tempList[1000];
-                    tempList[0] = strdup(it->name.c_str());
+                }  else if(it == commands->begin()) //if you are the first line but do not have an input redirect
+                {
                     int i = 1;
                     for(auto it2 = it->args.begin(); it2 != it->args.end(); it2++){
                         char* nonConst = strdup(it2->c_str());
-                        tempList[i] = nonConst;
+                        argList[i] = nonConst;
                         //std::cout << argList[i] << std::endl;
                         i++;
                     }
-                    tempList[i] = NULL;
-                    argList = tempList;
+                    argList[i] = NULL;
+                } else {//else you are to take the output of the previous command and use it as your input
+                    stringToArgv(pipeInput);
+                }
+                
+                    
+
                 
                 
+                argList[0] = strdup(it->name.c_str());
                 char *newenviron[] = { NULL };
 
-                // int fd1[2]; // Used to store two ends of first pipe
-                // int fd2[2]; // Used to store two ends of second pipe
-                                
-                // char fixed_str[] = "forgeeks.org";
-                // char input_str[100];
-                // pid_t p;
-                // if (pipe(fd1) == -1) {
-                //     fprintf(stderr, "Pipe Failed");
-                //     return 1;
-                // }
-                // if (pipe(fd2) == -1) {
-                //     fprintf(stderr, "Pipe Failed");
-                //     return 1;
-                // }           
+
 
 
                 //output redirect
                     int old_stdin = dup(STDIN_FILENO);
+                    int old_stout = dup(STDOUT_FILENO);
                     int* fd = new int[2]; // first index is read, second is write
                     pipe(fd);
 
@@ -139,20 +125,33 @@ int main(int args, char** argv) {
 
                 std::string response;
                 getline(std::cin, response);
-                dup2(old_stdin, STDIN_FILENO);
-                //iuf there is no outputfile specified, output to the command line
-                if (it->output_file == ""){ 
-                    if ((std::next(it) == commands->end()))
-                    {
-                        std::cout << response << std::endl;
-                    } else {
 
-                    }
-                    
-                    
-                } else {
-                    freopen (it->output_file.c_str(), "w", stdout);
+
+                dup2(old_stdin, STDIN_FILENO);
+               
+                if (it->output_file != "" && std::next(it) != commands->end()){ // if there is an output file specified for the current file and it is not the last command
+                    FILE* out = fopen(it->output_file.c_str(), "w");
+                    int fd2 = fileno(out); // first index is read, second is write
+                    dup2(fd2, STDOUT_FILENO);
                     std::cout << response << std::endl;
+                    dup2(old_stout, STDOUT_FILENO);
+                    fclose(out);
+                    
+                }
+                if(it->output_file != "" && std::next(it) == commands->end()) {// if there is an output file and it is the end
+                    FILE* out = fopen(it->output_file.c_str(), "w");
+                    int fd2 = fileno(out); // first index is read, second is write
+                    dup2(fd2, STDOUT_FILENO);
+                    std::cout << response << std::endl;
+                    dup2(old_stout, STDOUT_FILENO);
+                    fclose(out);
+
+                } else {
+                    if ((std::next(it) == commands->end())){ // if it is the end and there is no outputfile
+                            std::cout << response << std::endl;
+                    } else { //it is not the end. save the response to be used as the args for the next command
+                        pipeInput = response;
+                    }
                 }
                 
                 
