@@ -16,10 +16,23 @@ std::streambuf* stream_buffer_cout = std::cout.rdbuf(); //backup of cout stream 
 bool isCoutNormal = true;
 std::streambuf* stream_buffer_cin = std::cin.rdbuf(); //backup of cin stream buffer
 bool isCinNormal = true;
+char** argList;
 
-// char** stringToArgv(std::string str){
 
-// }
+
+void stringToArgv(std::string str){
+    char* tempList[1000];
+    std::string word;
+    int i = 1;
+    std::istringstream lineStream(str);
+    while (lineStream >> word)
+    {
+        tempList[i] = strdup(word.c_str());
+        i++;
+    }
+    argList[i] = NULL;
+    argList = tempList;
+}
 
 int main(int args, char** argv) {
     struct stat status;
@@ -40,8 +53,6 @@ int main(int args, char** argv) {
     // Pipe files or read from the user prompt
     // TODO: Groups will need to swap out getline() to detect the tab character.
     while (getline(std::cin, input)) {
-
-        std::cout << std::endl;
         
         // Add another case here if you are in a group to handle \t!
         if (input == "exit") {
@@ -53,48 +64,38 @@ int main(int args, char** argv) {
             for ( auto it = commands->begin(); it != commands->end(); it++){
                 std::string commandName = "/usr/bin/" + it->name;
                 // std::string commandName = it->name;
-                std::cout << "name: " << commandName << std::endl;
                 std::string input = it->input_file;
                 std::string outut = it->output_file;
-                char* argList[1000];
                 std::string argLine;
 
-
+                std::cout << it->input_file << std::endl;
                 //input redirect
                 std::fstream newCin;
-                if(it->input_file != ""){
+                if(it->input_file != "" && it == commands->begin()){
                     std::cout << "redirecting input" << std::endl;
                     newCin.open(it->input_file, std::ios::in);
                     getline(newCin,argLine);
 
-                    std::string word;
+                    stringToArgv(argLine);
+                    std::cout << "this runs" << std::endl;
                     int i = 1;
-                    std::istringstream lineStream(argLine);
-                    while (lineStream >> word)
-                    {
-                        argList[i] = strdup(word.c_str());
+                    while(argList[i] != NULL){
+                        std::cout << argList[i] << std::endl;
                         i++;
                     }
-                    argList[i] = NULL;
-
                     newCin.close();
                 }
-                else if(it == commands->begin()) //if you are the first command in the pipeline
-                {
-                    argList[0] = strdup(it->name.c_str());
+                    char* tempList[1000];
+                    tempList[0] = strdup(it->name.c_str());
                     int i = 1;
                     for(auto it2 = it->args.begin(); it2 != it->args.end(); it2++){
                         char* nonConst = strdup(it2->c_str());
-                        argList[i] = nonConst;
+                        tempList[i] = nonConst;
                         //std::cout << argList[i] << std::endl;
                         i++;
                     }
-                    argList[i] = NULL;
-                } else if(std::next(it) == commands->end()){ //if you are the last command in the pipeline
-
-                } else { //if you are not first or last then you must be second to second last
-
-                }
+                    tempList[i] = NULL;
+                    argList = tempList;
                 
                 
                 char *newenviron[] = { NULL };
@@ -116,6 +117,7 @@ int main(int args, char** argv) {
 
 
                 //output redirect
+                    int old_stdin = dup(STDIN_FILENO);
                     int* fd = new int[2]; // first index is read, second is write
                     pipe(fd);
 
@@ -137,9 +139,17 @@ int main(int args, char** argv) {
 
                 std::string response;
                 getline(std::cin, response);
+                dup2(old_stdin, STDIN_FILENO);
                 //iuf there is no outputfile specified, output to the command line
                 if (it->output_file == ""){ 
-                    std::cout << response << std::endl;
+                    if ((std::next(it) == commands->end()))
+                    {
+                        std::cout << response << std::endl;
+                    } else {
+
+                    }
+                    
+                    
                 } else {
                     freopen (it->output_file.c_str(), "w", stdout);
                     std::cout << response << std::endl;
