@@ -11,7 +11,11 @@
 #include <fstream>
 #include <sstream>
 
-
+/**
+ * Jack Bowman - 100752381
+ * Systems assignment #1
+ * mini shell with IO redirection and piping
+ */
 
 char* argList[1000];
 
