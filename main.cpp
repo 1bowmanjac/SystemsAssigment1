@@ -62,31 +62,42 @@ int main(int args, char** argv) {
                 std::string commandName = "/usr/bin/" + it->name; // this is needed to execute commands from the PATH instead of from the local folder
                 std::string argLine; // line of arguments seperated by spaces. used to read from file
 
-                //input redirect --> read from file rather than command line
-                std::fstream newCin;
-                if(it->input_file != "" && it == commands->begin()){ // if you are the first line and have an input redirect
+                // input redirect --> read from file rather than command line
+                // std::fstream newCin;
+                // if(it->input_file != "" && it == commands->begin()){ // if you are the first line and have an input redirect
     
-                    newCin.open(it->input_file, std::ios::in);
-                    getline(newCin,argLine);
+                //     newCin.open(it->input_file, std::ios::in);
+                //     getline(newCin,argLine);
 
-                    stringToArgv(argLine);
+                //     stringToArgv(argLine);
 
-                    newCin.close();
-                }  else if(it == commands->begin()) //if you are the first line but do not have an input redirect
+                //     newCin.close();
+                
+                if(it == commands->begin()) //if you are the first command
                 {
                     //goes through the argument list and converts the strings to c_strings before adding them to the argList
                     int i = 1;
                     for(auto it2 = it->args.begin(); it2 != it->args.end(); it2++){
+                        std::cout << "converting arglist" << std::endl;
                         char* nonConst = strdup(it2->c_str());
                         argList[i] = nonConst;
                         //std::cout << argList[i] << std::endl;
                         i++;
                     }
                     argList[i] = NULL;
+
                 } else {//else you are to take the output of the previous command and use it as your input
-                        //if this code is running then the current command is part of the pipline following the first first command
+                        //i first first command
                         //as such, it takes the arguments from the previous command's output rather than from the commands argument list
-                    stringToArgv(pipeInput);
+                    int old_stdin = dup(STDIN_FILENO);
+                    FILE* in = fopen("tmp", "r"); // open the output file
+                    int fdIn = fileno(in); // save the output file descriptor 
+                    dup2(fdIn, STDIN_FILENO); //redirect the output to the file
+                    std::string tempString;
+                    getline(std::cin,tempString);
+                    stringToArgv(tempString);
+                    dup2(old_stdin, STDIN_FILENO);//undo the redirect
+                    fclose(in);
                 }
                 
                     
@@ -94,8 +105,8 @@ int main(int args, char** argv) {
                 
                 //set the first argument in the argList to the command
                 argList[0] = strdup(it->name.c_str());
-                char *newenviron[] = { NULL };
 
+                char *newenviron[] = { NULL };
 
 
 
@@ -103,8 +114,18 @@ int main(int args, char** argv) {
                     int old_stdin = dup(STDIN_FILENO);
                     int old_stout = dup(STDOUT_FILENO);
 
+
                     //file descriptor for the pipline
                     int* fd = new int[2]; // first index is read, second is write
+
+                    int fdIn;
+                    if (it->input_file != "")
+                    {
+                        // std::cout << "making file desc" << std::endl;
+                        FILE* in = fopen(it->input_file.c_str(), "r"); // open the output file
+                        fdIn = fileno(in);
+                    }
+                    
                     pipe(fd);
 
                 //fork() a new proccess for each command
@@ -112,10 +133,17 @@ int main(int args, char** argv) {
                  pid_t pid = fork();
                  pid_t wpid;
                 if (pid > 0) { // if parent, redirect the STDIN to the pipe
+                    // std::cout << "parent redirecting cin to pipe" << std::endl;
                     dup2(fd[0], STDIN_FILENO);
                 } else //if child, redirect the output of the command from the console to the pipe
                 {
                     int fd_out = dup2(fd[1], STDOUT_FILENO); 
+                    if(it->input_file != ""){
+                        // std::cout << "got here";
+                        dup2(fdIn, STDIN_FILENO); //redirect the input to the file
+                        close(fdIn);
+                    }
+                    
                     execve(commandName.c_str(),argList,newenviron); //execute the command
                     return -1;
                 }
@@ -124,10 +152,24 @@ int main(int args, char** argv) {
                 wait(NULL);
 
                 //get the responce from the command run by the child proccess
+                // std::string response = "";
+                //  while (!std::cin.eof())
+                // {
+                //     std::string line;
+                //     getline(std::cin, line);
+
+                //     if (std::cin.fail())
+                //     {
+                //         //error
+                //         break;
+                //     }
+
+                //     response += line + "\n";
+                // }
+
                 std::string response;
                 getline(std::cin, response);
-
-
+                
                 dup2(old_stdin, STDIN_FILENO);//revert the STD file redirect
                
                //this is needed to cover the case where a file is part of the pipeline but also has an output file
@@ -153,6 +195,12 @@ int main(int args, char** argv) {
                     if ((std::next(it) == commands->end())){ // if it is the end and there is no outputfile output the command result to the commandline
                             std::cout << response << std::endl;
                     } else { //else the current command is part of a pipeline and the result of the command must be saved for the next line
+                        FILE* out = fopen("tmp", "w");
+                        int fd2 = fileno(out); 
+                        dup2(fd2, STDOUT_FILENO);
+                        std::cout << response << std::endl;
+                        dup2(old_stout, STDOUT_FILENO);
+                        fclose(out);
                         pipeInput = response;
                     }
                 }
