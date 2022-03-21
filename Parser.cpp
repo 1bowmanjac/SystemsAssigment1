@@ -76,9 +76,9 @@ std::list<Command>* Parser::Parse(std::string raw_input) {
             }
         }
         // Uncomment to see the comand structure. 
-        std::cout << "for command: " << new_command.name << std::endl;
-        std::cout << "    input: " << new_command.input_file << std::endl;
-        std::cout << "    output: " << new_command.output_file << std::endl;
+        // std::cout << "for command: " << new_command.name << std::endl;
+        // std::cout << "    input: " << new_command.input_file << std::endl;
+        // std::cout << "    output: " << new_command.output_file << std::endl;
 
         commands->push_back(new_command);
     }

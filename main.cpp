@@ -38,7 +38,6 @@ int main(int args, char** argv) {
     struct stat status;
     fstat(STDIN_FILENO, &status);
     std::string input;
-
     std::string pipeInput;
 
     
@@ -61,24 +60,12 @@ int main(int args, char** argv) {
             for ( auto it = commands->begin(); it != commands->end(); it++){
                 std::string commandName = "/usr/bin/" + it->name; // this is needed to execute commands from the PATH instead of from the local folder
                 std::string argLine; // line of arguments seperated by spaces. used to read from file
-
-                // input redirect --> read from file rather than command line
-                // std::fstream newCin;
-                // if(it->input_file != "" && it == commands->begin()){ // if you are the first line and have an input redirect
-    
-                //     newCin.open(it->input_file, std::ios::in);
-                //     getline(newCin,argLine);
-
-                //     stringToArgv(argLine);
-
-                //     newCin.close();
                 
                 if(it == commands->begin()) //if you are the first command
                 {
                     //goes through the argument list and converts the strings to c_strings before adding them to the argList
                     int i = 1;
                     for(auto it2 = it->args.begin(); it2 != it->args.end(); it2++){
-                        std::cout << "converting arglist" << std::endl;
                         char* nonConst = strdup(it2->c_str());
                         argList[i] = nonConst;
                         //std::cout << argList[i] << std::endl;
